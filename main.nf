@@ -370,6 +370,7 @@ process GetSoftwareVersions {
     """
     alleleCounter --version &> v_allelecount.txt  || true
     bcftools version > v_bcftools.txt 2>&1 || true
+    beagle | grep version >  v_beagle.txt 2>&1 || true
     bwa &> v_bwa.txt 2>&1 || true
     configManta.py --version > v_manta.txt 2>&1 || true
     configureStrelkaGermlineWorkflow.py --version > v_strelka.txt 2>&1 || true
@@ -379,11 +380,14 @@ process GetSoftwareVersions {
     fastqc --version > v_fastqc.txt 2>&1 || true
     freebayes --version > v_freebayes.txt 2>&1 || true
     gatk ApplyBQSR --help 2>&1 | grep Version: > v_gatk.txt 2>&1 || true
+    mapDamage --version 2>&1 > v_mapDamage.txt || true
     multiqc --version &> v_multiqc.txt 2>&1 || true
     qualimap --version &> v_qualimap.txt 2>&1 || true
     R --version &> v_r.txt  || true
     R -e "library(ASCAT); help(package='ASCAT')" &> v_ascat.txt
     samtools --version &> v_samtools.txt 2>&1 || true
+    R -e "library(sequenza); help(package='sequenza')" &> v_ascat.txt
+    skewer -v &> v_skewer.txt 2>&1 || true
     tiddit &> v_tiddit.txt 2>&1 || true
     vcftools --version &> v_vcftools.txt 2>&1 || true
     vep --help &> v_vep.txt 2>&1 || true
