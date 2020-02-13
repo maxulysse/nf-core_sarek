@@ -26,9 +26,9 @@ dependencies:
   - qualimap=2.2.2b
   - r-sequenza=3.0.0
   - samtools=1.9
-  - skewer=0.2.2
   - snpeff=4.3.1t
   - strelka=2.9.10
   - tiddit=2.7.1
+  - trimgalore=0.6.5
   - vcfanno=0.3.1
   - vcftools=0.1.16
