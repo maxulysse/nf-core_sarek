@@ -574,8 +574,8 @@ process GetSoftwareVersions {
     R -e "library(ASCAT); help(package='ASCAT')" &> v_ascat.txt
     samtools --version &> v_samtools.txt 2>&1 || true
     R -e "library(sequenza); help(package='sequenza')" &> v_ascat.txt
-    skewer -v &> v_skewer.txt 2>&1 || true
     tiddit &> v_tiddit.txt 2>&1 || true
+    trim_galore -v &> v_trim_galore.txt 2>&1 || true
     vcftools --version &> v_vcftools.txt 2>&1 || true
     vep --help &> v_vep.txt 2>&1 || true
 
