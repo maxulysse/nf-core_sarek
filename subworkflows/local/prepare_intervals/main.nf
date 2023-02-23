@@ -8,13 +8,15 @@
 
 include { BUILD_INTERVALS                                     } from '../../../modules/local/build_intervals/main'
 include { CREATE_INTERVALS_BED                                } from '../../../modules/local/create_intervals_bed/main'
-include { GATK4_INTERVALLISTTOBED                             } from '../../../modules/nf-core/gatk4/intervallisttobed/main'
+include { GATK4_INTERVALLISTTOBED as INTERVALLISTTOBED_BAIT   } from '../../../modules/nf-core/gatk4/intervallisttobed/main'
+include { GATK4_INTERVALLISTTOBED as INTERVALLISTTOBED_TARGET } from '../../../modules/nf-core/gatk4/intervallisttobed/main'
 include { TABIX_BGZIPTABIX as TABIX_BGZIPTABIX_INTERVAL_SPLIT } from '../../../modules/nf-core/tabix/bgziptabix/main'
 
 workflow PREPARE_INTERVALS {
     take:
     fasta_fai    // mandatory [ fasta_fai ]
     intervals    // [ params.intervals ]
+    bait         // [ params.bait ]
     no_intervals // [ params.no_intervals ]
 
     main:
@@ -29,12 +31,15 @@ workflow PREPARE_INTERVALS {
         file("${params.outdir}/no_intervals.bed.gz").text     = "no_intervals\n"
         file("${params.outdir}/no_intervals.bed.gz.tbi").text = "no_intervals\n"
 
+        bait_bed             = Channel.value([])
         intervals_bed        = Channel.fromPath(file("${params.outdir}/no_intervals.bed")).map{ it -> [ it, 0 ] }
         intervals_bed_gz_tbi = Channel.fromPath(file("${params.outdir}/no_intervals.bed.{gz,gz.tbi}")).collect().map{ it -> [ it, 0 ] }
         intervals_combined   = Channel.fromPath(file("${params.outdir}/no_intervals.bed")).map{ it -> [ [ id:it.simpleName ], it ] }
     } else if (params.step != 'annotate' && params.step != 'controlfreec') {
         // If no interval/target file is provided, then generated intervals from FASTA file
         if (!intervals) {
+            bait_bed = Channel.value([])
+
             BUILD_INTERVALS(fasta_fai.map{it -> [ [ id:it.baseName ], it ] })
 
             intervals_combined = BUILD_INTERVALS.out.bed
@@ -46,17 +51,19 @@ workflow PREPARE_INTERVALS {
             versions = versions.mix(BUILD_INTERVALS.out.versions)
             versions = versions.mix(CREATE_INTERVALS_BED.out.versions)
         } else {
-            intervals_combined = Channel.fromPath(file(intervals)).map{it -> [ [ id:it.baseName ], it ] }
-            intervals_bed = CREATE_INTERVALS_BED(file(intervals)).bed
+            if (bait) {
+                INTERVALLISTTOBED_BAIT(bait)
+                bait_bed = INTERVALLISTTOBED_BAIT.out.bed
+                versions = versions.mix(INTERVALLISTTOBED_BAIT.out.versions)
+            }
+
+            INTERVALLISTTOBED_TARGET(intervals_combined)
+            intervals_combined = INTERVALLISTTOBED_TARGET.out.bed
+
+            intervals_bed = CREATE_INTERVALS_BED(file(intervals)).out.bed
 
             versions = versions.mix(CREATE_INTERVALS_BED.out.versions)
-
-            // If interval file is not provided as .bed, but e.g. as .interval_list then convert to BED format
-            if (intervals.endsWith(".interval_list")) {
-                GATK4_INTERVALLISTTOBED(intervals_combined)
-                intervals_combined = GATK4_INTERVALLISTTOBED.out.bed
-                versions = versions.mix(GATK4_INTERVALLISTTOBED.out.versions)
-            }
+            versions = versions.mix(INTERVALLISTTOBED_TARGET.out.versions)
         }
 
         // Now for the intervals.bed the following operations are done:
@@ -102,6 +109,7 @@ workflow PREPARE_INTERVALS {
     intervals_bed_gz_tbi   // [ target.bed.gz, target.bed.gz.tbi, num_intervals ]
     // All intervals in one file
     intervals_bed_combined // [ intervals.bed ]
+    bait_bed               // [ bait.bed ]
 
     versions               // [ versions.yml ]
 }

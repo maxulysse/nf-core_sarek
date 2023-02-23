@@ -15,6 +15,7 @@ def checkPathParamList = [
     params.ascat_loci,
     params.ascat_loci_gc,
     params.ascat_loci_rt,
+    params.bait,
     params.bwa,
     params.bwamem2,
     params.cf_chrom_len,
@@ -58,8 +59,9 @@ for (param in checkPathParamList) if (param) file(param, checkIfExists: true)
 // Set input, can either be from --input or from automatic retrieval in WorkflowSarek.groovy
 input_sample = params.build_only_index ? Channel.empty() : extract_csv(file(params.input, checkIfExists: true))
 
-// Fails when wrongfull extension for intervals file
+// Fails when wrongfull extension for bait and target or intervals file
 if (params.wes && !params.step == 'annotate') {
+    if (params.bait && !params.bait.endsWith("bed")) exit 1, "Bait file specified with `--bait` must be in BED format for targeted data"
     if (params.intervals && !params.intervals.endsWith("bed")) exit 1, "Target file specified with `--intervals` must be in BED format for targeted data"
     else log.warn("Intervals file was provided without parameter `--wes`: Pipeline will assume this is Whole-Genome-Sequencing data.")
 } else if (params.intervals && !params.intervals.endsWith("bed") && !params.intervals.endsWith("list")) exit 1, "Intervals file must end with .bed, .list, or .interval_list"
@@ -229,6 +231,9 @@ include { FASTQ_ALIGN_BWAMEM_MEM2_DRAGMAP                } from '../subworkflows
 // Merge and index BAM files (optional)
 include { BAM_MERGE_INDEX_SAMTOOLS                       } from '../subworkflows/local/bam_merge_index_samtools/main'
 
+// HSMetrics on aligned reads
+include { PICARD_COLLECTHSMETRICS                        } from '../modules/nf-core/picard/collecthsmetrics/main'
+
 // Convert BAM files
 include { SAMTOOLS_CONVERT as BAM_TO_CRAM                } from '../modules/nf-core/samtools/convert/main'
 include { SAMTOOLS_CONVERT as BAM_TO_CRAM_MAPPING        } from '../modules/nf-core/samtools/convert/main'
@@ -372,12 +377,18 @@ workflow SAREK {
     known_sites_snps_tbi = dbsnp_tbi.concat(known_snps_tbi).collect()
 
     // Build intervals if needed
-    PREPARE_INTERVALS(fasta_fai, params.intervals, params.no_intervals)
+    PREPARE_INTERVALS(fasta_fai, params.intervals, params.bait, params.no_intervals)
 
     // Intervals for speed up preprocessing/variant calling by spread/gather
-    // [interval.bed] all intervals in one file
+    // [interval.bed] all intervals in one file (or Target BED regions for WES)
     intervals_bed_combined      = params.no_intervals ? Channel.value([])      : PREPARE_INTERVALS.out.intervals_bed_combined
+
+    // [bait.bed] bait in one file
+    bait_bed                    = PREPARE_INTERVALS.out.bait_bed
+
     // For QC during preprocessing, we don't need any intervals (MOSDEPTH doesn't take them for WGS)
+    // except for HSmetrics, which needs a bait file as well, but for that we use the bait_bed channel
+    // and the intervals_bed_combined for the target regions
     intervals_for_preprocessing = params.wes ?
         intervals_bed_combined.map{it -> [ [ id:it.baseName ], it ]}.collect() :
         [ [ id:'null' ], [] ]
@@ -548,6 +559,16 @@ workflow SAREK {
             // Gather used softwares versions
             versions = versions.mix(BAM_MERGE_INDEX_SAMTOOLS.out.versions)
             versions = versions.mix(BAM_TO_CRAM_MAPPING.out.versions)
+        } else if (params.bait) {
+            BAM_MERGE_INDEX_SAMTOOLS(bam_mapped)
+
+            PICARD_COLLECTHSMETRICS(BAM_MERGE_INDEX_SAMTOOLS.out.bam_bai, fasta.map{ fasta -> [ [ id:fasta.baseName ], fasta ] }, fasta_fai.map{ fasta_fai -> [ [ id:fasta_fai.baseName ], fasta_fai ] }, bait_bed, intervals_bed_combined)
+
+            // Gather QC reports
+            reports = reports.mix(PICARD_COLLECTHSMETRICS.out.metrics.collect{ meta, metrics -> metrics })
+
+            // Gather used softwares versions
+            versions = versions.mix(PICARD_COLLECTHSMETRICS.out.versions)
         }
 
         // Gather used softwares versions
