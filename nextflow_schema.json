@@ -65,6 +65,12 @@
                     "description": "Enable when exome or panel data is provided.",
                     "help_text": "With this parameter flags in various tools are set for targeted sequencing data. It is recommended to enable for whole-exome and panel data analysis."
                 },
+                "bait": {
+                    "type": "string",
+                    "fa_icon": "fas fa-file-alt",
+                    "help_text": "Used for QC purpose only.",
+                    "description": "Path to bait bed file in case of targeted sequencing."
+                },
                 "intervals": {
                     "type": "string",
                     "fa_icon": "fas fa-file-alt",
