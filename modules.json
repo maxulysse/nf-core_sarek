@@ -36,6 +36,11 @@
                         "git_sha": "618364f55cb88f6c283f6c6c45c24d5f9f08f998",
                         "installed_by": ["modules"]
                     },
+                    "bedtools/makewindows": {
+                        "branch": "master",
+                        "git_sha": "3b248b84694d1939ac4bb33df84bf6233a34d668",
+                        "installed_by": ["modules"]
+                    },
                     "bwa/index": {
                         "branch": "master",
                         "git_sha": "086fa66260595e123b0ea47a6512539b72a9afa3",
